@@ -68,7 +68,7 @@ except ImportError:
 # =============================================================================
 CONFIG = {
     # Web paneli
-    "HOST": "0.0.0.0",
+    "HOST": "127.0.0.1",
     "PORT": 8080,
     "REFRESH_INTERVAL_MS": 2000,      # Panelin yenilenme aralığı (ms)
 
@@ -78,11 +78,11 @@ CONFIG = {
 
     # Telegram Bot
     "TELEGRAM_BOT_TOKEN": "",         # <-- BURAYA BOT TOKEN'INIZI GİRİN
-    "TELEGRAM_CHAT_ID": "",           # Opsiyonel: sadece bu chat id'ye izin ver (boşsa herkes)
+    "TELEGRAM_CHAT_ID": "",           # Güvenlik için zorunlu: izin verilen Telegram chat ID
     "TELEGRAM_POLL_TIMEOUT": 25,      # long-polling timeout (sn)
 
     # Güvenlik
-    "ALLOW_REBOOT_SHUTDOWN": True,    # /reboot ve /shutdown komutlarına izin ver
+    "ALLOW_REBOOT_SHUTDOWN": False,   # Güvenlik için varsayılan olarak kapalı
 }
 
 # Docker image/isimlerinden otomatik servis tespiti için bilinen servisler.
@@ -630,9 +630,10 @@ def handle_telegram_update(update):
         chat_id = message.get("chat", {}).get("id")
         text = (message.get("text") or "").strip()
 
-        allowed_chat = CONFIG["TELEGRAM_CHAT_ID"]
-        if allowed_chat and str(chat_id) != str(allowed_chat):
-            return  # Whitelist dışı sohbetleri sessizce yok say
+        allowed_chat = str(CONFIG["TELEGRAM_CHAT_ID"]).strip()
+        # İzinli sohbet kimliği tanımlı değilse bot hiçbir komutu çalıştırmaz.
+        if not allowed_chat or str(chat_id) != allowed_chat:
+            return  # Whitelist dışı veya yapılandırılmamış sohbetleri sessizce yok say
 
         command = text.split()[0].lower() if text else ""
         handler = TELEGRAM_COMMANDS.get(command)
@@ -1257,7 +1258,6 @@ class MonitorRequestHandler(BaseHTTPRequestHandler):
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(body)
